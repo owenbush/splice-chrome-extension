@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Splice Batch License Generator",
+  "version": "1.0.0",
+  "description": "Generate licenses for multiple Splice samples at once",
+  "author": "Owen",
+  "homepage_url": "https://github.com/owen/splice-chrome-extension",
+
+
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab",
+    "scripting",
+    "downloads"
+  ],
+
+  "host_permissions": [
+    "https://splice.com/*",
+    "https://api.splice.com/*",
+    "https://auth.splice.com/*"
+  ],
+
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://splice.com/*"],
+      "js": ["content/content-script.js"],
+      "run_at": "document_end"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Splice License Generator"
+  },
+
+  "options_page": "options/options.html",
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*", "content/page-script.js"],
+      "matches": ["https://splice.com/*"]
+    }
+  ]
+}

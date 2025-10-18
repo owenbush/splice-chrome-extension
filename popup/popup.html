@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Splice Batch License Generator</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Splice Batch License Generator</h1>
+      <div class="version">v1.0.0</div>
+    </header>
+
+    <!-- Authentication Status -->
+    <div id="authStatus" class="status-section">
+      <div class="status-indicator" id="statusIndicator"></div>
+      <div class="status-content">
+        <span id="statusText">Checking authentication...</span>
+        <div id="statusDetails" class="status-details"></div>
+      </div>
+    </div>
+
+    <!-- License Info Status -->
+    <div id="licenseInfoStatus" class="status-section" style="display: none;">
+      <div class="status-indicator" id="licenseStatusIndicator"></div>
+      <div class="status-content">
+        <span id="licenseStatusText">Checking license information...</span>
+        <div id="licenseStatusDetails" class="status-details"></div>
+      </div>
+    </div>
+
+    <!-- Main Interface -->
+    <div id="mainInterface" class="main-interface" style="display: none;">
+      <div class="input-section">
+        <label for="sampleInput" class="input-label">
+          Sample Names (one per line):
+        </label>
+        <textarea
+          id="sampleInput"
+          class="sample-input"
+          placeholder="Enter sample names, one per line...&#10;&#10;Example:&#10;DBM_TC2_124_Erhu_Loop_A_Heroes_Tale_C#min.wav&#10;Another_Sample_Name.wav"
+          rows="6"
+        ></textarea>
+        <div id="sampleCount" class="sample-count">0 samples</div>
+      </div>
+
+      <div class="button-section">
+        <button id="processSamples" class="btn btn-primary" disabled>
+          <span class="btn-text">Generate Licenses</span>
+          <span class="btn-loading" style="display: none;">Processing...</span>
+        </button>
+        <button id="clearInput" class="btn btn-secondary">Clear</button>
+      </div>
+
+      <!-- Progress Section -->
+      <div id="progressSection" class="progress-section" style="display: none;">
+        <div class="progress-header">
+          <span id="progressText">Processing samples...</span>
+          <span id="progressCount">0 / 0</span>
+        </div>
+        <div class="progress-bar">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <div id="progressDetails" class="progress-details"></div>
+      </div>
+
+      <!-- Results Section -->
+      <div id="resultsSection" class="results-section" style="display: none;">
+        <div class="results-header">
+          <h3>Results</h3>
+          <div class="results-actions">
+            <button id="clearResults" class="btn btn-small">Reset</button>
+          </div>
+        </div>
+        <div id="resultsContent" class="results-content"></div>
+      </div>
+    </div>
+
+    <!-- Login Prompt -->
+    <div id="loginPrompt" class="prompt-section" style="display: none;">
+      <div class="prompt-icon">🔐</div>
+      <h3>Please Log In to Splice</h3>
+      <p>To use this extension, please log in to Splice.com first.</p>
+      <button id="openSplice" class="btn btn-primary">Open Splice.com</button>
+    </div>
+
+    <!-- License Info Prompt -->
+    <div id="licenseInfoPrompt" class="prompt-section" style="display: none;">
+      <div class="prompt-icon">⚙️</div>
+      <h3>Configure License Information</h3>
+      <p>Please set up your license information before generating licenses.</p>
+      <button id="openOptions" class="btn btn-primary">Open Settings</button>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-links">
+        <button id="openOptionsFooter" class="footer-link">Settings</button>
+        <button id="openHelp" class="footer-link">Help</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Scripts -->
+  <script src="../shared/encryption.js"></script>
+  <script src="../shared/utils.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
