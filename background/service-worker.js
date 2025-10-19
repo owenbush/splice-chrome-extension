@@ -450,104 +450,75 @@ class SpliceAPIManager {
    */
   async searchSamples(query) {
     try {
+      // Use GraphQL API via content script - no navigation needed!
+      // Just need ANY Splice tab to execute the query
 
-      // Use the direct Splice search URL pattern
-      const searchUrl = `https://splice.com/sounds/search/samples?filepath=${encodeURIComponent(query)}`;
+      let spliceTabs = await chrome.tabs.query({ url: 'https://splice.com/*' });
+      let targetTab;
 
-      // Try to use content script to navigate to search page and extract results
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (spliceTabs.length === 0) {
+        // Create a hidden background tab at the Splice home page
+        targetTab = await chrome.tabs.create({
+          url: 'https://splice.com/',
+          active: false // Keep it hidden
+        });
 
-      if (!tab || !tab.url.includes('splice.com')) {
-        // If not on Splice.com, check if we have a Splice tab open
-        const spliceTabs = await chrome.tabs.query({ url: 'https://splice.com/*' });
-
-        if (spliceTabs.length === 0) {
-          throw new Error('No Splice.com tab found for search');
-        }
-
-        // Use the first Splice tab
-        const spliceTab = spliceTabs[0];
-
-        try {
-          await chrome.tabs.update(spliceTab.id, { url: searchUrl });
-
-          // Wait for page to load
-          await new Promise(resolve => setTimeout(resolve, 3000));
-
-          const response = await chrome.tabs.sendMessage(spliceTab.id, {
-            action: 'extractSearchResults'
-          });
-
-          if (response && response.success) {
-            return {
-              query,
-              results: response.results || [],
-              total: response.total || 0,
-              success: true
-            };
-          } else {
-            throw new Error(response?.error || 'Search extraction failed');
-          }
-        } catch (error) {
-          // Handle connection errors gracefully
-          if (error.message && error.message.includes('Receiving end does not exist')) {
-            return {
-              query,
-              results: [],
-              success: false,
-              error: 'Please refresh the Splice.com page and try again.'
-            };
-          }
-
-          console.error('Search extraction failed:', error);
-          return {
-            query,
-            results: [],
-            success: false,
-            error: error.message || 'Search failed'
-          };
-        }
+        // Wait for the tab to load
+        await new Promise(resolve => setTimeout(resolve, 3000));
       } else {
-        // We're on Splice.com, navigate to search page
-        try {
-          await chrome.tabs.update(tab.id, { url: searchUrl });
+        // Use an existing Splice tab (any one will do)
+        targetTab = spliceTabs[0];
+      }
 
-          // Wait for page to load
-          await new Promise(resolve => setTimeout(resolve, 3000));
+      // Use the content script to search via GraphQL (no navigation!)
+      try {
+        const response = await chrome.tabs.sendMessage(targetTab.id, {
+          action: 'searchSampleViaGraphQL',
+          sampleName: query
+        });
 
-          const response = await chrome.tabs.sendMessage(tab.id, {
-            action: 'extractSearchResults'
-          });
+        if (response && response.success) {
+          // Convert GraphQL response format to our expected format
+          const result = response.sample ? {
+            id: response.sample.assetUuid,
+            name: query,
+            url: null,
+            inLibrary: response.sample.licensed || false,
+            metadata: {}
+          } : null;
 
-          if (response && response.success) {
-            return {
-              query,
-              results: response.results || [],
-              total: response.total || 0,
-              success: true
-            };
-          } else {
-            throw new Error(response?.error || 'Search extraction failed');
-          }
-        } catch (error) {
-          // Handle connection errors gracefully
-          if (error.message && error.message.includes('Receiving end does not exist')) {
-            return {
-              query,
-              results: [],
-              success: false,
-              error: 'Please refresh the Splice.com page and try again.'
-            };
-          }
-
-          console.error('Search extraction failed:', error);
+          return {
+            query,
+            results: result ? [result] : [],
+            total: result ? 1 : 0,
+            success: true
+          };
+        } else {
           return {
             query,
             results: [],
             success: false,
-            error: error.message || 'Search failed'
+            error: response?.error || 'Sample not found'
           };
         }
+      } catch (error) {
+        // Handle connection errors gracefully
+        if (error.message && error.message.includes('Receiving end does not exist')) {
+          return {
+            query,
+            results: [],
+            success: false,
+            error: 'Please refresh the Splice.com page and try again.'
+          };
+        }
+
+        console.error('Search failed:', error);
+        return {
+          query,
+          results: [],
+          success: false,
+          error: error.message || 'Search failed'
+        };
       }
     } catch (error) {
       console.error('Search failed:', error);

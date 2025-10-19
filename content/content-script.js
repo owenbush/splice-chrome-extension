@@ -1131,10 +1131,10 @@ class SpliceContentScript {
 
   /**
    * Get sample details via GraphQL SamplesSearch query
+   * Uses page context to access auth token and get accurate library status
    */
   async getSampleDetails(sampleName) {
     try {
-
       const graphqlRequest = {
         operationName: 'SamplesSearch',
         variables: {
@@ -1179,27 +1179,8 @@ class SpliceContentScript {
         }`
       };
 
-
-      const response = await fetch('https://surfaces-graphql.splice.com/graphql', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Origin': 'https://splice.com',
-          'Referer': 'https://splice.com/'
-        },
-        body: JSON.stringify(graphqlRequest)
-      });
-
-      if (!response.ok) {
-        console.error('SamplesSearch request failed:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('Error response body:', errorText);
-        throw new Error(`SamplesSearch request failed: ${response.status}`);
-      }
-
-      const result = await response.json();
+      // Execute in page context to get accurate auth and library status
+      const result = await this.executeInPageContext(graphqlRequest);
 
       if (result.data && result.data.assetsSearch && result.data.assetsSearch.items && result.data.assetsSearch.items.length > 0) {
         const sample = result.data.assetsSearch.items[0];
@@ -1276,7 +1257,17 @@ class SpliceContentScript {
       // Inject script into page context to make the request with full authentication
       const result = await this.executeInPageContext(graphqlRequest);
 
-      return result;
+      // Handle GraphQL response format for license generation
+      if (result.data && result.data.proofOfLicense) {
+        const proofOfLicense = result.data.proofOfLicense;
+        return {
+          success: true,
+          result: proofOfLicense,
+          downloadUrl: proofOfLicense.downloadUrl
+        };
+      } else {
+        throw new Error('Invalid response from Splice. Please try again.');
+      }
     } catch (error) {
       console.error('GraphQL license generation failed:', error);
       return {
@@ -1362,21 +1353,12 @@ class SpliceContentScript {
         } else if (errorMessages.includes('404') || errorMessages.includes('Not Found')) {
           throw new Error('Sample not found on Splice. Please check the sample name.');
         } else {
-          throw new Error(`Failed to generate license: ${errorMessages}`);
+          throw new Error(`GraphQL error: ${errorMessages}`);
         }
       }
 
-      // Handle GraphQL response format
-      if (result.data && result.data.proofOfLicense) {
-        const proofOfLicense = result.data.proofOfLicense;
-        return {
-          success: true,
-          result: proofOfLicense,
-          downloadUrl: proofOfLicense.downloadUrl
-        };
-      } else {
-        throw new Error('Invalid response from Splice. Please try again.');
-      }
+      // Return the full result (could be search or license data)
+      return result;
     } catch (error) {
       throw error;
     }
@@ -1538,6 +1520,18 @@ class SpliceContentScript {
               sendResponse(results);
             }).catch(error => {
               console.error('Search failed:', error);
+              sendResponse({ success: false, error: error.message });
+            });
+            return true; // Indicate we will send response asynchronously
+
+          case 'searchSampleViaGraphQL':
+            this.getSampleDetails(message.sampleName).then(sampleDetails => {
+              sendResponse({
+                success: true,
+                sample: sampleDetails
+              });
+            }).catch(error => {
+              console.error('Sample search failed:', error);
               sendResponse({ success: false, error: error.message });
             });
             return true; // Indicate we will send response asynchronously
