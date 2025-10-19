@@ -9,7 +9,81 @@ class PopupManager {
     this.currentResults = [];
     this.STATE_KEY = 'popup_state';
     this.saveStateTimeout = null;
+    this.setupGlobalErrorHandler();
     this.init();
+  }
+
+  /**
+   * Setup global error handler to prevent popup from closing
+   */
+  setupGlobalErrorHandler() {
+    // Catch unhandled errors
+    window.addEventListener('error', (event) => {
+      event.preventDefault();
+      console.error('Unhandled error:', event.error);
+
+      // Check if extension context is invalidated
+      if (event.error && event.error.message &&
+          event.error.message.includes('Extension context invalidated')) {
+        ExtensionUtils.showNotification(
+          'Extension was reloaded. Please close and reopen this popup.',
+          'error'
+        );
+      } else {
+        ExtensionUtils.showNotification(
+          'An unexpected error occurred. Please try again.',
+          'error'
+        );
+      }
+    });
+
+    // Catch unhandled promise rejections
+    window.addEventListener('unhandledrejection', (event) => {
+      event.preventDefault();
+      console.error('Unhandled promise rejection:', event.reason);
+
+      const errorMessage = event.reason?.message || String(event.reason);
+
+      // Check if extension context is invalidated
+      if (errorMessage.includes('Extension context invalidated')) {
+        ExtensionUtils.showNotification(
+          'Extension was reloaded. Please close and reopen this popup.',
+          'error'
+        );
+      } else if (errorMessage.includes('Receiving end does not exist')) {
+        ExtensionUtils.showNotification(
+          'Please refresh the Splice.com page and try again.',
+          'error'
+        );
+      } else {
+        ExtensionUtils.showNotification(
+          'An unexpected error occurred. Please try again.',
+          'error'
+        );
+      }
+    });
+  }
+
+  /**
+   * Safe wrapper for chrome.runtime.sendMessage with error handling
+   */
+  async safeSendMessage(message) {
+    try {
+      // Check if chrome.runtime is available
+      if (!chrome.runtime || !chrome.runtime.id) {
+        throw new Error('Extension context invalidated');
+      }
+
+      return await chrome.runtime.sendMessage(message);
+    } catch (error) {
+      // Handle specific errors
+      if (error.message.includes('Extension context invalidated')) {
+        throw new Error('Extension was reloaded. Please close and reopen this popup.');
+      } else if (error.message.includes('Receiving end does not exist')) {
+        throw new Error('Cannot communicate with extension. Please try again.');
+      }
+      throw error;
+    }
   }
 
   /**
@@ -20,6 +94,13 @@ class PopupManager {
 
     // Restore previous state first
     await this.restoreState();
+
+    // Force a fresh authentication check (clear cache)
+    try {
+      await this.safeSendMessage({ action: 'clearSessionCache' });
+    } catch (error) {
+      console.error('Failed to clear session cache:', error);
+    }
 
     // Add retry mechanism for initialization
     let retryCount = 0;
@@ -178,7 +259,7 @@ class PopupManager {
    */
   async checkAuthentication() {
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'checkAuth' });
+      const response = await this.safeSendMessage({ action: 'checkAuth' });
 
       // Handle undefined or null response
       if (!response) {
@@ -200,7 +281,6 @@ class PopupManager {
         this.showLoginPrompt(authResponse.error || 'Not logged in');
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
 
       // Handle specific error types
       if (error.message.includes('Extension context invalidated')) {
@@ -231,7 +311,6 @@ class PopupManager {
         this.showLicenseInfoPrompt();
       }
     } catch (error) {
-      console.error('License info check failed:', error);
       this.showLicenseInfoPrompt();
     }
   }
@@ -244,7 +323,7 @@ class PopupManager {
     document.getElementById('statusIndicator').className = 'status-indicator success';
 
     // Handle different user data structures to get username
-    let username = 'Unknown';
+    let username = null;
 
     if (user) {
       if (typeof user === 'string') {
@@ -258,7 +337,22 @@ class PopupManager {
       }
     }
 
-    document.getElementById('statusText').textContent = `Logged in as ${username}`;
+    // Validate username isn't generic text
+    if (username) {
+      const lowerUsername = username.toLowerCase();
+      const genericTerms = ['unknown', 'user avatar', 'avatar', 'user', 'log in', 'login'];
+      if (genericTerms.some(term => lowerUsername === term || lowerUsername.includes(term))) {
+        username = null;
+      }
+    }
+
+    // Display appropriate text based on whether we have a username
+    if (username) {
+      document.getElementById('statusText').textContent = `Logged in as ${username}`;
+    } else {
+      document.getElementById('statusText').textContent = 'Logged in to Splice';
+    }
+
     document.getElementById('statusDetails').textContent = 'Ready to generate licenses';
     document.getElementById('mainInterface').style.display = 'flex';
   }
@@ -336,7 +430,6 @@ class PopupManager {
     const validation = ExtensionUtils.validateSampleInput(input.value);
 
     if (!validation.isValid) {
-      console.error('Validation failed:', validation.errors);
       ExtensionUtils.showNotification(`Validation failed: ${validation.errors.join(', ')}`, 'error');
       return;
     }
@@ -350,7 +443,6 @@ class PopupManager {
       this.showResults(results);
       await this.saveState();
     } catch (error) {
-      console.error('Processing failed:', error);
       ExtensionUtils.showNotification(`Processing failed: ${ExtensionUtils.formatError(error)}`, 'error');
     } finally {
       this.isProcessing = false;
@@ -373,7 +465,7 @@ class PopupManager {
         this.updateProgress(i + 1, total, `Processing: ${sample}`);
 
         // Step 1: Search for sample
-        const searchResult = await chrome.runtime.sendMessage({
+        const searchResult = await this.safeSendMessage({
           action: 'searchSamples',
           query: sample
         });
@@ -382,7 +474,7 @@ class PopupManager {
           results.push({
             sample,
             success: false,
-            error: searchResult.error || 'Sample not found'
+            error: searchResult.error || 'Sample not found on Splice. Please verify the sample name is correct.'
           });
           continue;
         }
@@ -398,11 +490,20 @@ class PopupManager {
           continue;
         }
 
+        // Check if sample is in library
+        if (bestMatch.inLibrary === false) {
+          results.push({
+            sample,
+            success: false,
+            error: 'Sample not in your library. Please add this sample to your Splice library before generating a license.'
+          });
+          continue;
+        }
+
         // Step 2: Generate license using API
         const licenseInfo = await this.getLicenseInfo();
 
         if (!licenseInfo) {
-          console.error('License information not configured');
           results.push({
             sample,
             success: false,
@@ -420,7 +521,6 @@ class PopupManager {
         const decoded = atob(licenseInfo);
         decodedLicenseInfo = JSON.parse(decoded);
       } catch (e) {
-        console.error('Failed to decode license info:', e);
         results.push({
           sample,
           success: false,
@@ -429,7 +529,7 @@ class PopupManager {
         continue;
       }
 
-      const licenseResult = await chrome.runtime.sendMessage({
+      const licenseResult = await this.safeSendMessage({
         action: 'generateLicense',
         sampleId: bestMatch.id,
         licenseInfo: {
@@ -509,7 +609,6 @@ class PopupManager {
       const result = await chrome.storage.local.get(['licenseInfo']);
       return result.licenseInfo;
     } catch (error) {
-      console.error('Failed to get license info:', error);
       return null;
     }
   }

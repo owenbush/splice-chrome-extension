@@ -3,7 +3,7 @@
   "name": "Splice Batch License Generator",
   "version": "1.0.0",
   "description": "Generate licenses for multiple Splice samples at once",
-  "author": "Owen",
+  "author": "Owen Bush",
   "homepage_url": "https://github.com/owen/splice-chrome-extension",
 
 
@@ -12,7 +12,8 @@
     "tabs",
     "activeTab",
     "scripting",
-    "downloads"
+    "downloads",
+    "cookies"
   ],
 
   "host_permissions": [

@@ -7,7 +7,97 @@ class SpliceSessionManager {
   constructor() {
     this.sessionCache = null;
     this.sessionTimestamp = null;
-    this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+    this.cacheTimeout = 30 * 1000; // 30 seconds (reduced from 5 minutes)
+  }
+
+  /**
+   * Check authentication via cookies (most reliable method)
+   * @returns {Promise<Object|null>} Cookie-based auth status or null if inconclusive
+   */
+  async checkAuthViaCookies() {
+    try {
+      // Get all cookies for splice.com and subdomains
+      const cookies = await chrome.cookies.getAll({
+        domain: 'splice.com'
+      });
+
+      // Check .splice.com (with leading dot for all subdomains)
+      const domainCookies = await chrome.cookies.getAll({
+        domain: '.splice.com'
+      });
+
+      // Also check auth.splice.com for Auth0 tokens
+      const authCookies = await chrome.cookies.getAll({
+        domain: 'auth.splice.com'
+      });
+
+      // Combine and deduplicate cookies
+      const allCookies = [...cookies, ...domainCookies, ...authCookies];
+      const uniqueCookies = Array.from(
+        new Map(allCookies.map(c => [c.name + c.domain, c])).values()
+      );
+
+
+      // If we have no cookies at all, user is definitely not logged in
+      if (uniqueCookies.length === 0) {
+        return {
+          loggedIn: false,
+          method: 'cookies',
+          reason: 'no_cookies'
+        };
+      }
+
+      // Look for Splice-specific authentication cookies
+      // Based on testing: _splice_token_prod is the most reliable indicator
+      // auth0 cookie persists even after logout, so we can't rely on it alone
+      const auth0Cookie = uniqueCookies.find(c => c.name === 'auth0');
+      const spliceTokenCookie = uniqueCookies.find(c => c.name === '_splice_token_prod');
+      const xsrfCookie = uniqueCookies.find(c => c.name === 'XSRF-TOKEN');
+
+      const hasAuth0 = !!auth0Cookie;
+      const hasSpliceToken = !!spliceTokenCookie;
+
+      // Check if auth0 cookie is expired
+      if (auth0Cookie) {
+        const now = Date.now() / 1000; // Convert to seconds
+        const expiry = auth0Cookie.expirationDate;
+        const isExpired = expiry && expiry < now;
+
+        if (isExpired) {
+          return {
+            loggedIn: false,
+            method: 'cookies',
+            reason: 'auth0_expired'
+          };
+        }
+      }
+
+      // User is logged in ONLY if we have the Splice token
+      // The _splice_token_prod is deleted on logout, making it reliable
+      if (hasSpliceToken) {
+        return {
+          loggedIn: true,
+          method: 'cookies',
+          user: null // Will be extracted from DOM
+        };
+      }
+
+      // If we only have auth0 but no splice token, user is logged out
+      if (hasAuth0 && !hasSpliceToken) {
+        return {
+          loggedIn: false,
+          method: 'cookies',
+          reason: 'no_splice_token'
+        };
+      }
+
+      // We have cookies but no specific auth cookie
+      // This could mean logged in or out - return inconclusive
+      return null; // Fall through to DOM check
+    } catch (error) {
+      console.error('Cookie check failed:', error);
+      return null; // Inconclusive, fall back to other methods
+    }
   }
 
   /**
@@ -20,6 +110,23 @@ class SpliceSessionManager {
       if (this.sessionCache && this.isSessionCacheValid()) {
         return this.sessionCache;
       }
+
+      // FIRST: Try cookie-based authentication (most reliable)
+      const cookieAuth = await this.checkAuthViaCookies();
+
+      if (cookieAuth && cookieAuth.loggedIn === false) {
+        // Cookies indicate NOT logged in - return immediately
+        const authStatus = {
+          loggedIn: false,
+          method: 'cookies',
+          timestamp: Date.now()
+        };
+        this.sessionCache = authStatus;
+        this.sessionTimestamp = Date.now();
+        return authStatus;
+      }
+
+      // If cookies indicate logged in OR inconclusive, continue to get username from DOM
 
       // Get current active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -55,6 +162,19 @@ class SpliceSessionManager {
 
             return authStatus;
           } else {
+            // If cookies said logged in but DOM says not, trust the cookies
+            if (cookieAuth && cookieAuth.loggedIn === true) {
+              const authStatus = {
+                loggedIn: true,
+                user: null,
+                method: 'cookies_override',
+                timestamp: Date.now()
+              };
+              this.sessionCache = authStatus;
+              this.sessionTimestamp = Date.now();
+              return authStatus;
+            }
+
             const authStatus = {
               loggedIn: false,
               error: 'Not logged in to Splice',
@@ -125,6 +245,19 @@ class SpliceSessionManager {
 
             return authStatus;
           } else {
+            // If cookies said logged in but DOM says not, trust the cookies
+            if (cookieAuth && cookieAuth.loggedIn === true) {
+              const authStatus = {
+                loggedIn: true,
+                user: null,
+                method: 'cookies_override',
+                timestamp: Date.now()
+              };
+              this.sessionCache = authStatus;
+              this.sessionTimestamp = Date.now();
+              return authStatus;
+            }
+
             const authStatus = {
               loggedIn: false,
               error: 'Not logged in to Splice',
@@ -137,9 +270,6 @@ class SpliceSessionManager {
             return authStatus;
           }
         } catch (error) {
-          console.error('Content script communication failed:', error);
-          console.error('Error details:', error.message);
-
           // Try to inject content script if it's not loaded
           if (error.message.includes('Receiving end does not exist')) {
             try {
@@ -240,6 +370,14 @@ class SpliceSessionManager {
   isSessionCacheValid() {
     if (!this.sessionTimestamp) return false;
     return (Date.now() - this.sessionTimestamp) < this.cacheTimeout;
+  }
+
+  /**
+   * Force a fresh session check by clearing the cache
+   */
+  forceFreshCheck() {
+    this.sessionCache = null;
+    this.sessionTimestamp = null;
   }
 
   /**
@@ -351,8 +489,23 @@ class SpliceAPIManager {
             throw new Error(response?.error || 'Search extraction failed');
           }
         } catch (error) {
+          // Handle connection errors gracefully
+          if (error.message && error.message.includes('Receiving end does not exist')) {
+            return {
+              query,
+              results: [],
+              success: false,
+              error: 'Please refresh the Splice.com page and try again.'
+            };
+          }
+
           console.error('Search extraction failed:', error);
-          throw error;
+          return {
+            query,
+            results: [],
+            success: false,
+            error: error.message || 'Search failed'
+          };
         }
       } else {
         // We're on Splice.com, navigate to search page
@@ -377,8 +530,23 @@ class SpliceAPIManager {
             throw new Error(response?.error || 'Search extraction failed');
           }
         } catch (error) {
+          // Handle connection errors gracefully
+          if (error.message && error.message.includes('Receiving end does not exist')) {
+            return {
+              query,
+              results: [],
+              success: false,
+              error: 'Please refresh the Splice.com page and try again.'
+            };
+          }
+
           console.error('Search extraction failed:', error);
-          throw error;
+          return {
+            query,
+            results: [],
+            success: false,
+            error: error.message || 'Search failed'
+          };
         }
       }
     } catch (error) {
@@ -386,7 +554,7 @@ class SpliceAPIManager {
       return {
         query,
         results: [],
-        error: error.message,
+        error: error.message || 'Search failed. Please try again.',
         success: false
       };
     }
@@ -486,8 +654,23 @@ class SpliceAPIManager {
             throw new Error(response?.error || 'License generation failed');
           }
         } catch (error) {
+          // Handle connection errors gracefully
+          if (error.message && error.message.includes('Receiving end does not exist')) {
+            return {
+              sampleId,
+              success: false,
+              error: 'Please refresh the Splice.com page and try again.',
+              licenseInfo: licenseInfo
+            };
+          }
+
           console.error('License generation failed:', error);
-          throw error;
+          return {
+            sampleId,
+            success: false,
+            error: error.message || 'License generation failed',
+            licenseInfo: licenseInfo
+          };
         }
       } else {
         // We're on Splice.com, use current tab
@@ -511,8 +694,23 @@ class SpliceAPIManager {
             throw new Error(response?.error || 'License generation failed');
           }
         } catch (error) {
+          // Handle connection errors gracefully
+          if (error.message && error.message.includes('Receiving end does not exist')) {
+            return {
+              sampleId,
+              success: false,
+              error: 'Please refresh the Splice.com page and try again.',
+              licenseInfo: licenseInfo
+            };
+          }
+
           console.error('License generation failed:', error);
-          throw error;
+          return {
+            sampleId,
+            success: false,
+            error: error.message || 'License generation failed',
+            licenseInfo: licenseInfo
+          };
         }
       }
     } catch (error) {
@@ -561,6 +759,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'clearSessionCache':
           sessionManager.clearSessionCache();
           return { success: true };
+
+        case 'debugCookies':
+          // Debug: List all Splice cookies
+          try {
+            const spliceCookies = await chrome.cookies.getAll({ domain: 'splice.com' });
+            const spliceDomainCookies = await chrome.cookies.getAll({ domain: '.splice.com' });
+            const authCookies = await chrome.cookies.getAll({ domain: 'auth.splice.com' });
+
+            // Combine and deduplicate
+            const allCookies = [...spliceCookies, ...spliceDomainCookies, ...authCookies];
+            const uniqueCookies = Array.from(
+              new Map(allCookies.map(c => [c.name + c.domain, c])).values()
+            );
+
+            return {
+              success: true,
+              spliceCookies: uniqueCookies.map(c => ({
+                name: c.name,
+                domain: c.domain,
+                value: c.value.substring(0, 20) + '...',
+                secure: c.secure,
+                httpOnly: c.httpOnly
+              })),
+              authCookies: [] // Keep for backward compat but already included above
+            };
+          } catch (error) {
+            return { success: false, error: error.message };
+          }
 
         case 'testContentScript':
           // Test if we can communicate with content script
@@ -617,6 +843,25 @@ chrome.runtime.onInstalled.addListener((details) => {
 // Handle tab updates to clear session cache when navigating away from Splice
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url && !tab.url.includes('splice.com')) {
+    sessionManager.clearSessionCache();
+  }
+});
+
+// Listen for cookie changes to detect login/logout
+chrome.cookies.onChanged.addListener((changeInfo) => {
+  // Only care about Splice cookies
+  if (!changeInfo.cookie.domain.includes('splice.com')) {
+    return;
+  }
+
+  // Check if it's an auth-related cookie
+  const authCookieNames = ['auth0', '_splice_token_prod', 'XSRF-TOKEN'];
+  const isAuthCookie = authCookieNames.some(name =>
+    changeInfo.cookie.name === name
+  );
+
+  if (isAuthCookie) {
+    // Clear cache to force re-check on next popup open
     sessionManager.clearSessionCache();
   }
 });

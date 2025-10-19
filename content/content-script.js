@@ -117,77 +117,64 @@ class SpliceContentScript {
    */
   extractUserData() {
     try {
+      // Check URL for auth-related paths first (before any DOM access)
+      const url = window.location.href;
+      if (url.includes('/login') || url.includes('/auth') || url.includes('/signin')) {
+        return { loggedIn: false, detected: true, reason: 'auth_page' };
+      }
 
-      // Method 1: Check for user data in window object
-      if (window.__INITIAL_STATE__ && window.__INITIAL_STATE__.user) {
-        return { loggedIn: true, user: window.__INITIAL_STATE__.user };
+      // FIRST: Check for login/logout buttons to detect logged out state
+      // Wrap in try-catch as DOM queries can throw on some pages
+      try {
+        const loginButtons = [
+          document.querySelector('a[href*="login"]'),
+          document.querySelector('button[class*="login"]'),
+          document.querySelector('[data-testid*="login"]'),
+          document.querySelector('a[href*="signin"]'),
+          document.querySelector('button[class*="signin"]')
+        ];
+
+        // If we find login buttons, user is definitely not logged in
+        if (loginButtons.some(button => button !== null && button.offsetParent !== null)) {
+          return { loggedIn: false, detected: true, reason: 'login_button_found' };
+        }
+      } catch (domError) {
+        // DOM query failed, continue to other methods
+      }
+
+      // Method 1: Check for user data in window object (most reliable)
+      try {
+        if (window.__INITIAL_STATE__ && window.__INITIAL_STATE__.user) {
+          return { loggedIn: true, user: window.__INITIAL_STATE__.user };
+        }
+      } catch (stateError) {
+        // Can't access __INITIAL_STATE__, continue to other methods
       }
 
       // Method 2: Check for user data in other common locations
-      if (window.user) {
-        return { loggedIn: true, user: window.user };
+      try {
+        if (window.user) {
+          return { loggedIn: true, user: window.user };
+        }
+      } catch (userError) {
+        // Can't access window.user, continue to other methods
       }
 
       // Method 3: Try to extract user info from DOM elements
-      const userInfo = this.extractUserInfoFromDOM();
-      if (userInfo) {
-        return { loggedIn: true, user: userInfo };
+      try {
+        const userInfo = this.extractUserInfoFromDOM();
+        if (userInfo) {
+          return { loggedIn: true, user: userInfo };
+        }
+      } catch (domError) {
+        // DOM extraction failed, continue
       }
 
-      // Method 4: Check for authentication indicators in DOM
-      const authIndicators = [
-        document.querySelector('[data-testid="user-menu"]'),
-        document.querySelector('.user-avatar'),
-        document.querySelector('[data-user-id]'),
-        document.querySelector('.logged-in'),
-        document.querySelector('[class*="user"]'),
-        document.querySelector('[class*="profile"]'),
-        document.querySelector('button[aria-label*="user"]'),
-        document.querySelector('button[aria-label*="profile"]'),
-        document.querySelector('[class*="avatar"]'),
-        document.querySelector('[class*="account"]')
-      ];
-
-      if (authIndicators.some(indicator => indicator !== null)) {
-        return { loggedIn: true, detected: true };
-      }
-
-      // Method 5: Check for login/logout buttons (inverse logic)
-      const loginButtons = [
-        document.querySelector('a[href*="login"]'),
-        document.querySelector('button[class*="login"]'),
-        document.querySelector('[data-testid*="login"]'),
-        document.querySelector('a[href*="signin"]'),
-        document.querySelector('button[class*="signin"]')
-      ];
-
-      if (loginButtons.some(button => button !== null)) {
-        return { loggedIn: false, detected: true };
-      }
-
-      // Method 6: Check URL for auth-related paths
-      const url = window.location.href;
-      if (url.includes('/login') || url.includes('/auth') || url.includes('/signin')) {
-        return { loggedIn: false, detected: true };
-      }
-
-      // Method 7: Check for Splice-specific elements
-      const spliceElements = [
-        document.querySelector('[class*="sounds"]'),
-        document.querySelector('[class*="library"]'),
-        document.querySelector('[class*="search"]'),
-        document.querySelector('[class*="sample"]'),
-        document.querySelector('[class*="pack"]')
-      ];
-
-      if (spliceElements.some(element => element !== null)) {
-        return { loggedIn: true, detected: true };
-      }
-
-      return { loggedIn: false, detected: false };
+      // If we got here and didn't find login buttons, assume not logged in
+      return { loggedIn: false, detected: false, reason: 'no_indicators_found' };
     } catch (error) {
       console.error('User data extraction failed:', error);
-      return { loggedIn: false, error: error.message };
+      return { loggedIn: false, error: String(error), reason: 'exception' };
     }
   }
 
@@ -196,75 +183,46 @@ class SpliceContentScript {
    */
   extractUserInfoFromDOM() {
     try {
-      // Look for user name in various places - Splice-specific selectors
+      // List of words to exclude (login/signup related AND generic placeholders)
+      const excludeWords = [
+        'log in', 'login', 'sign in', 'signin', 'sign up', 'signup',
+        'try now', 'get started', 'register', 'user avatar', 'avatar',
+        'profile picture', 'profile image', 'user icon', 'account',
+        'menu', 'button', 'image', 'icon'
+      ];
+
+      // Look for user name in very specific places only
       const userNameSelectors = [
         '[data-testid="user-name"]',
         '[data-testid="username"]',
         '[data-testid="profile-name"]',
         '.user-name',
         '.username',
-        '.profile-name',
-        '[class*="username"]',
-        '[class*="user-name"]',
-        '[class*="profile-name"]',
-        'button[aria-label*="user"]',
-        'button[aria-label*="profile"]',
-        'button[aria-label*="account"]',
-        // Common navigation patterns
-        'nav [class*="user"]',
-        'header [class*="user"]',
-        '.navbar [class*="user"]',
-        '.header [class*="user"]'
+        '.profile-name'
       ];
 
       for (const selector of userNameSelectors) {
         const element = document.querySelector(selector);
         if (element) {
-          const text = element.textContent || element.getAttribute('aria-label') || '';
-          if (text && text.trim() && text.length > 1) {
+          const text = (element.textContent || '').trim();
+          const lowerText = text.toLowerCase();
+
+          // Validate it's actually a username and not a login button or generic text
+          if (text && text.length > 1 && text.length < 30 &&
+              !excludeWords.some(word => lowerText.includes(word)) &&
+              !lowerText.startsWith('user') && // Don't accept "User avatar", "User menu", etc.
+              !lowerText.endsWith('avatar') &&
+              !lowerText.endsWith('menu')) {
             return {
-              username: text.trim(),
+              username: text,
               detected: true
             };
           }
         }
       }
 
-      // Look for user avatar or profile image
-      const avatarSelectors = [
-        'img[alt*="user"]',
-        'img[alt*="profile"]',
-        'img[alt*="avatar"]',
-        '.user-avatar img',
-        '[class*="avatar"] img',
-        '[class*="profile"] img'
-      ];
-
-      for (const selector of avatarSelectors) {
-        const element = document.querySelector(selector);
-        if (element) {
-          const alt = element.getAttribute('alt') || '';
-          if (alt && alt.trim() && alt.length > 1) {
-            return {
-              username: alt.trim(),
-              detected: true
-            };
-          }
-        }
-      }
-
-      // Look for any text that might be a username (fallback)
-      const possibleUsernameElements = document.querySelectorAll('[class*="user"], [class*="profile"], [class*="account"]');
-      for (const element of possibleUsernameElements) {
-        const text = element.textContent?.trim();
-        if (text && text.length > 1 && text.length < 50 && !text.includes(' ')) {
-          // Likely a username if it's short, no spaces, and in a user-related element
-          return {
-            username: text,
-            detected: true
-          };
-        }
-      }
+      // Skip avatar/image alt text extraction - too unreliable
+      // It often contains generic text like "User avatar" instead of actual usernames
 
       return null;
     } catch (error) {
@@ -463,7 +421,6 @@ class SpliceContentScript {
         timestamp: Date.now()
       });
     } catch (error) {
-      console.error('Failed to send session data:', error);
     }
   }
 
@@ -478,7 +435,6 @@ class SpliceContentScript {
         timestamp: Date.now()
       });
     } catch (error) {
-      console.error('Failed to send page data:', error);
     }
   }
 
@@ -1397,7 +1353,17 @@ class SpliceContentScript {
       // Check for GraphQL errors
       if (result.errors && result.errors.length > 0) {
         const errorMessages = result.errors.map(e => e.message).join(', ');
-        throw new Error(`GraphQL errors: ${errorMessages}`);
+
+        // Provide user-friendly error messages
+        if (errorMessages.includes('403') || errorMessages.includes('Forbidden')) {
+          throw new Error('Sample not in your library. Add this sample to your library before generating a license.');
+        } else if (errorMessages.includes('401') || errorMessages.includes('Unauthorized')) {
+          throw new Error('Authentication expired. Please refresh the Splice.com page and try again.');
+        } else if (errorMessages.includes('404') || errorMessages.includes('Not Found')) {
+          throw new Error('Sample not found on Splice. Please check the sample name.');
+        } else {
+          throw new Error(`Failed to generate license: ${errorMessages}`);
+        }
       }
 
       // Handle GraphQL response format
@@ -1409,10 +1375,9 @@ class SpliceContentScript {
           downloadUrl: proofOfLicense.downloadUrl
         };
       } else {
-        throw new Error('Invalid GraphQL response format');
+        throw new Error('Invalid response from Splice. Please try again.');
       }
     } catch (error) {
-      console.error('GraphQL request failed:', error);
       throw error;
     }
   }

@@ -81,10 +81,8 @@ class OptionsManager {
       if (licenseInfo) {
         document.getElementById('legalName').value = licenseInfo.legalName || '';
         document.getElementById('artistName').value = licenseInfo.artistName || '';
-        document.getElementById('companyName').value = licenseInfo.companyName || '';
       }
     } catch (error) {
-      console.error('Failed to load license info:', error);
     }
   }
 
@@ -94,7 +92,6 @@ class OptionsManager {
   async saveLicenseInfo() {
     const legalName = document.getElementById('legalName').value.trim();
     const artistName = document.getElementById('artistName').value.trim();
-    const companyName = document.getElementById('companyName').value.trim();
 
     // Validate required fields
     if (!legalName || !artistName) {
@@ -104,8 +101,7 @@ class OptionsManager {
 
     const licenseData = {
       legalName,
-      artistName,
-      companyName: companyName || ''
+      artistName
     };
 
     try {
@@ -117,7 +113,6 @@ class OptionsManager {
         this.showStatusMessage('Failed to save license information', 'error');
       }
     } catch (error) {
-      console.error('Save license info failed:', error);
       this.showStatusMessage('Failed to save license information', 'error');
     }
   }
@@ -136,13 +131,11 @@ class OptionsManager {
       if (success) {
         document.getElementById('legalName').value = '';
         document.getElementById('artistName').value = '';
-        document.getElementById('companyName').value = '';
         this.showStatusMessage('License information cleared', 'success');
       } else {
         this.showStatusMessage('Failed to clear license information', 'error');
       }
     } catch (error) {
-      console.error('Clear license info failed:', error);
       this.showStatusMessage('Failed to clear license information', 'error');
     }
   }
@@ -229,7 +222,6 @@ class OptionsManager {
       // Reset form
       document.getElementById('legalName').value = '';
       document.getElementById('artistName').value = '';
-      document.getElementById('companyName').value = '';
 
       this.showStatusMessage('All data cleared', 'success');
     } catch (error) {
