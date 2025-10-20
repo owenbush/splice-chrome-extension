@@ -1,4 +1,4 @@
-# Splice Batch License Generator
+# Splice License Batch Generator
 
 A Chrome extension that automates the process of generating certified licenses for multiple Splice samples at once.
 
@@ -10,7 +10,7 @@ A Chrome extension that automates the process of generating certified licenses f
 
 ## 🎯 Overview
 
-The Splice Batch License Generator streamlines the tedious process of generating licenses for Splice samples. Instead of manually navigating to each sample and generating licenses one by one, this extension allows you to:
+The Splice License Batch Generator streamlines the tedious process of generating licenses for Splice samples. Instead of manually navigating to each sample and generating licenses one by one, this extension allows you to:
 
 - 📝 **Batch Process**: Generate licenses for multiple samples simultaneously
 - ⚡ **Fast & Efficient**: Direct API integration for quick processing

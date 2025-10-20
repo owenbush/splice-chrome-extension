@@ -1,5 +1,5 @@
 /**
- * Service Worker for Splice Batch License Generator
+ * Service Worker for Splice License Batch Generator
  * Handles session management, API coordination, and background tasks
  */
 

@@ -1,5 +1,5 @@
 /**
- * Options page JavaScript for Splice Batch License Generator
+ * Options page JavaScript for Splice License Batch Generator
  * Handles license information configuration and settings management
  */
 

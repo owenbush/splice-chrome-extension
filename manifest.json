@@ -1,11 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Splice Batch License Generator",
+  "name": "Splice License Batch Generator",
   "version": "1.0.0",
   "description": "Generate licenses for multiple Splice samples at once",
   "author": "Owen Bush",
-  "homepage_url": "https://github.com/owen/splice-chrome-extension",
+  "homepage_url": "https://owenbush.github.io/splice-chrome-extension/",
 
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
 
   "permissions": [
     "storage",
@@ -36,7 +42,13 @@
 
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Splice License Generator"
+    "default_title": "Splice License Generator",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
 
   "options_page": "options/options.html",

@@ -1,5 +1,5 @@
 /**
- * Popup JavaScript for Splice Batch License Generator
+ * Popup JavaScript for Splice License Batch Generator
  * Handles user interface interactions and communication with service worker
  */
 
@@ -753,7 +753,7 @@ class PopupManager {
    */
   showHelp() {
     const helpText = `
-Splice Batch License Generator Help
+Splice License Batch Generator Help
 
 1. Make sure you're logged in to Splice.com
 2. Configure your license information in Settings
