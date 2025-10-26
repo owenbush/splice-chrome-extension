@@ -116,3 +116,4 @@ identify store-assets/screenshots/*.png
 
 **Once you've saved your screenshots, you'll be almost ready for Chrome Web Store submission!** 🚀
 
+
