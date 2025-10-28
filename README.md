@@ -2,6 +2,8 @@
 
 A Chrome extension that automates the process of generating certified licenses for multiple Splice samples at once.
 
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install-brightgreen?style=for-the-badge&logo=googlechrome)](https://chromewebstore.google.com/detail/splice-license-batch-gene/mklfddejmeabhcpfafmejpaklnijddon)
+
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Chrome](https://img.shields.io/badge/chrome-88%2B-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -47,9 +49,17 @@ The Splice License Batch Generator streamlines the tedious process of generating
 
 ### Installation
 
+#### Option 1: Chrome Web Store (Recommended)
+
+**[Install from Chrome Web Store](https://chromewebstore.google.com/detail/splice-license-batch-gene/mklfddejmeabhcpfafmejpaklnijddon)** 🚀
+
+One-click installation, automatic updates, and verified by Google.
+
+#### Option 2: Manual Installation (For Development)
+
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/splice-chrome-extension.git
+   git clone https://github.com/owenbush/splice-chrome-extension.git
    cd splice-chrome-extension
    ```
 
@@ -59,7 +69,9 @@ The Splice License Batch Generator streamlines the tedious process of generating
    - Click "Load unpacked"
    - Select the `splice-chrome-extension` directory
 
-3. **Configure License Info**
+### Configuration
+
+1. **Configure License Info**
    - Click the extension icon
    - Click "Open Settings"
    - Enter your Full Legal Name and Artist Name
