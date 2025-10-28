@@ -1,3 +1,10 @@
+<!--
+    INSTRUCTIONS: After Chrome Web Store approval
+    1. Replace [EXTENSION_ID] with your actual Chrome Web Store extension ID
+    2. Rename this file to index.html (backup the old one first)
+    3. Commit and push to update GitHub Pages
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,6 +12,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Splice License Batch Generator - Chrome Extension</title>
     <style>
+        /* Copy the same styles from index.html */
         * {
             margin: 0;
             padding: 0;
@@ -46,6 +54,42 @@
             color: #667eea;
             margin-bottom: 15px;
         }
+        .install-cta {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .install-cta h2 {
+            color: white;
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 700;
+            font-size: 1.2em;
+            transition: transform 0.2s;
+            margin: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.3);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            padding: 12px 30px;
+            font-size: 1em;
+        }
         .features {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -62,23 +106,6 @@
             color: #34495e;
             margin-bottom: 8px;
             font-size: 1.1em;
-        }
-        .btn {
-            display: inline-block;
-            padding: 12px 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: 600;
-            transition: transform 0.2s;
-            margin: 10px 10px 10px 0;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-        }
-        .btn-secondary {
-            background: #6c757d;
         }
         .footer {
             text-align: center;
@@ -108,6 +135,20 @@
 
         <div class="card" style="text-align: center;">
             <img src="assets/promo-tile.png" alt="Splice License Batch Generator" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        </div>
+
+        <!-- INSTALL CTA -->
+        <div class="install-cta">
+            <h2>✨ Available Now!</h2>
+            <p style="font-size: 1.2em; margin-bottom: 20px;">
+                Install the extension and start batch-generating your Splice licenses in seconds.
+            </p>
+            <a href="https://chromewebstore.google.com/detail/splice-license-batch-gene/mklfddejmeabhcpfafmejpaklnijddon" class="btn" target="_blank" rel="noopener">
+                🚀 Add to Chrome - It's Free!
+            </a>
+            <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.9;">
+                One-click installation • No signup required • Works instantly
+            </p>
         </div>
 
         <div class="card">
@@ -143,33 +184,17 @@
         </div>
 
         <div class="card">
-            <h2>Installation</h2>
-            <p style="font-size: 1.1em; margin-bottom: 20px;">
-                <strong>🚀 Coming Soon to Chrome Web Store!</strong><br>
-                The extension is currently in the submission process. Once approved, you'll be able to install it with one click.
-            </p>
-
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #667eea;">Quick Setup (3 steps)</h3>
-                <ol style="margin-bottom: 0;">
-                    <li>Install from Chrome Web Store (link coming soon)</li>
-                    <li>Click the extension icon in your toolbar</li>
-                    <li>Enter your license information in settings</li>
-                </ol>
-            </div>
-
-            <p style="font-size: 0.9em; color: #6c757d; margin-top: 15px;">
-                <strong>For Developers:</strong> Want to contribute or run from source?
-                <a href="https://github.com/owenbush/splice-chrome-extension" target="_blank" rel="noopener">Visit the GitHub repository</a>
-                for development instructions.
-            </p>
-
-            <div style="margin-top: 20px;">
-                <a href="https://github.com/owenbush/splice-chrome-extension/blob/main/USER_GUIDE.md" class="btn" target="_blank" rel="noopener">
-                    📖 User Guide
-                </a>
-                <a href="https://github.com/owenbush/splice-chrome-extension" class="btn btn-secondary" target="_blank" rel="noopener">
-                    💻 View Source
+            <h2>How It Works</h2>
+            <ol style="font-size: 1.1em; line-height: 2;">
+                <li>Install the extension from Chrome Web Store</li>
+                <li>Click the extension icon in your Chrome toolbar</li>
+                <li>Configure your license information (one-time setup)</li>
+                <li>Enter your sample names (one per line)</li>
+                <li>Click "Process Samples" and get your licenses!</li>
+            </ol>
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="https://chromewebstore.google.com/detail/splice-license-batch-gene/mklfddejmeabhcpfafmejpaklnijddon" class="btn" target="_blank" rel="noopener">
+                    Get Started Now
                 </a>
             </div>
         </div>
@@ -181,6 +206,24 @@
                 <li>Active Splice.com account</li>
                 <li>Samples in your Splice library</li>
             </ul>
+        </div>
+
+        <div class="card">
+            <h2>Support & Documentation</h2>
+            <p style="margin-bottom: 15px;">
+                Need help getting started? Check out our comprehensive guides:
+            </p>
+            <div>
+                <a href="https://github.com/owenbush/splice-chrome-extension/blob/main/USER_GUIDE.md" class="btn btn-secondary" target="_blank" rel="noopener">
+                    📖 User Guide
+                </a>
+                <a href="https://github.com/owenbush/splice-chrome-extension/issues" class="btn btn-secondary" target="_blank" rel="noopener">
+                    💬 Report Issue
+                </a>
+                <a href="https://github.com/owenbush/splice-chrome-extension" class="btn btn-secondary" target="_blank" rel="noopener">
+                    💻 View Source
+                </a>
+            </div>
         </div>
 
         <div class="card">
@@ -207,6 +250,7 @@
                 Made with ❤️ by <a href="https://github.com/owenbush" target="_blank" rel="noopener">Owen Bush</a>
             </p>
             <p style="margin-top: 10px;">
+                <a href="https://chromewebstore.google.com/detail/splice-license-batch-gene/mklfddejmeabhcpfafmejpaklnijddon" target="_blank" rel="noopener">Chrome Web Store</a> |
                 <a href="https://github.com/owenbush/splice-chrome-extension" target="_blank" rel="noopener">GitHub</a> |
                 <a href="privacy-policy.html">Privacy Policy</a> |
                 <a href="https://github.com/owenbush/splice-chrome-extension/issues" target="_blank" rel="noopener">Report Issue</a>
